@@ -1,215 +1,183 @@
-import { ArrowLeft, Clock, Wind, Waves, MapPin, Navigation } from "lucide-react";
-import { Button } from "./ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { ForecastStrip } from "./ForecastStrip";
-import { Badge } from "./ui/badge";
+import { useEffect, useMemo, useState } from "react"
+import { ArrowLeft, Clock, Wind, Waves, MapPin, Navigation } from "lucide-react"
+import { Button } from "./ui/button"
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
+import { ForecastStrip } from "./ForecastStrip"
+import { Badge } from "./ui/badge"
+
+/** ---------- helpers ---------- **/
+
+type Obs = {
+  time?: string
+  windDirDeg?: number | null
+  windKts?: number | null
+  gustKts?: number | null
+  waveHeightFt?: number | null
+  domPeriodS?: number | null
+  meanWaveDirDeg?: number | null
+  waterTempF?: number | null
+  airTempF?: number | null
+}
+const round = (n: number | null | undefined, d = 0) =>
+  n == null ? "—" : Number(n.toFixed(d)).toString()
+const degToDir = (deg?: number | null) => {
+  if (deg == null || isNaN(deg)) return "—"
+  const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"]
+  return dirs[Math.round((deg % 360) / 22.5) % 16]
+}
+
+/** ---------- per-leg data ---------- **/
+
+const ALL_LEGS = {
+  "1": {
+    from: { name: "San Diego", lat: 32.7157, lon: -117.1611 },
+    to: { name: "Oceanside", lat: 33.1958, lon: -117.3831 },
+    midpoint: { name: "Del Mar", lat: 32.9595, lon: -117.2661 },
+    distance: "35 nm est",
+    duration: "6-8h",
+    buoys: [
+      { id: "46232", name: "Point Loma South" },
+      { id: "46086", name: "San Clemente Basin" },
+    ],
+  },
+  "2": {
+    from: { name: "Oceanside", lat: 33.1958, lon: -117.3831 },
+    to: { name: "Two Harbors", lat: 33.4447, lon: -118.4895 },
+    midpoint: { name: "Mid-Channel", lat: 33.3203, lon: -117.9363 },
+    distance: "42 nm est",
+    duration: "8-10h",
+    buoys: [
+      { id: "46086", name: "San Clemente Basin" },
+      { id: "46025", name: "Santa Monica Bay" },
+      { id: "46221", name: "Santa Barbara West" },
+    ],
+  },
+  "3": {
+    from: { name: "Two Harbors", lat: 33.4447, lon: -118.4895 },
+    to: { name: "Marina del Rey", lat: 33.9806, lon: -118.4494 },
+    midpoint: { name: "Redondo Canyon", lat: 33.7127, lon: -118.4695 },
+    distance: "28 nm est",
+    duration: "5-7h",
+    buoys: [
+      { id: "46025", name: "Santa Monica Bay" },
+      { id: "46222", name: "San Pedro" },
+    ],
+  },
+} as const
 
 interface LegDetailProps {
-  onBack: () => void;
-  legId: string | null;
+  onBack: () => void
+  legId: string | null
 }
 
 export function LegDetail({ onBack, legId }: LegDetailProps) {
-  // Comprehensive leg data for all legs
-  const allLegsData = {
-    "1": {
-      from: { name: "San Diego", lat: 32.7157, lon: -117.1611 },
-      to: { name: "Oceanside", lat: 33.1958, lon: -117.3831 },
-      midpoint: { name: "Del Mar", lat: 32.9595, lon: -117.2661 },
-      distance: "35 nm est",
-      duration: "6-8h"
-    },
-    "2": {
-      from: { name: "Oceanside", lat: 33.1958, lon: -117.3831 },
-      to: { name: "Two Harbors", lat: 33.4447, lon: -118.4895 },
-      midpoint: { name: "Mid-Channel", lat: 33.3203, lon: -117.9363 },
-      distance: "42 nm est",
-      duration: "8-10h"
-    },
-    "3": {
-      from: { name: "Two Harbors", lat: 33.4447, lon: -118.4895 },
-      to: { name: "Marina del Rey", lat: 33.9806, lon: -118.4494 },
-      midpoint: { name: "Redondo Canyon", lat: 33.7127, lon: -118.4695 },
-      distance: "28 nm est",
-      duration: "5-7h"
-    }
-  };
+  const currentLegId = legId || "2"
+  const leg = ALL_LEGS[currentLegId as keyof typeof ALL_LEGS] || ALL_LEGS["2"]
 
-  // Default to leg 2 if no legId provided
-  const currentLegId = legId || "2";
-  const legData = allLegsData[currentLegId as keyof typeof allLegsData] || allLegsData["2"];
-
-  // Forecast locations with detailed data
-  const forecastLocations = [
-    {
-      name: `${legData.from.name} (Start)`,
-      coordinates: `${legData.from.lat.toFixed(3)}°N, ${Math.abs(legData.from.lon).toFixed(3)}°W`,
-      forecast: [
-        { time: "08:00", windSpeed: 12, windGust: 15, windDirection: 45, waveHeight: 3, wavePeriod: 8 },
-        { time: "09:00", windSpeed: 14, windGust: 18, windDirection: 60, waveHeight: 4, wavePeriod: 9 },
-        { time: "10:00", windSpeed: 16, windGust: 20, windDirection: 75, waveHeight: 4, wavePeriod: 9 },
-        { time: "11:00", windSpeed: 18, windGust: 22, windDirection: 90, waveHeight: 5, wavePeriod: 10 },
-        { time: "12:00", windSpeed: 20, windGust: 25, windDirection: 105, waveHeight: 5, wavePeriod: 10 }
-      ]
-    },
-    {
-      name: `${legData.midpoint.name}`,
-      coordinates: `${legData.midpoint.lat.toFixed(3)}°N, ${Math.abs(legData.midpoint.lon).toFixed(3)}°W`,
-      forecast: [
-        { time: "08:00", windSpeed: 15, windGust: 18, windDirection: 50, waveHeight: 4, wavePeriod: 9 },
-        { time: "09:00", windSpeed: 17, windGust: 21, windDirection: 65, waveHeight: 5, wavePeriod: 10 },
-        { time: "10:00", windSpeed: 19, windGust: 23, windDirection: 80, waveHeight: 6, wavePeriod: 11 },
-        { time: "11:00", windSpeed: 21, windGust: 26, windDirection: 95, waveHeight: 6, wavePeriod: 11 },
-        { time: "12:00", windSpeed: 23, windGust: 29, windDirection: 110, waveHeight: 7, wavePeriod: 12 }
-      ]
-    },
-    {
-      name: `${legData.to.name} (End)`,
-      coordinates: `${legData.to.lat.toFixed(3)}°N, ${Math.abs(legData.to.lon).toFixed(3)}°W`,
-      forecast: [
-        { time: "08:00", windSpeed: 10, windGust: 13, windDirection: 40, waveHeight: 2, wavePeriod: 7 },
-        { time: "09:00", windSpeed: 12, windGust: 16, windDirection: 55, waveHeight: 3, wavePeriod: 8 },
-        { time: "10:00", windSpeed: 14, windGust: 18, windDirection: 70, waveHeight: 3, wavePeriod: 8 },
-        { time: "11:00", windSpeed: 16, windGust: 20, windDirection: 85, waveHeight: 4, wavePeriod: 9 },
-        { time: "12:00", windSpeed: 18, windGust: 23, windDirection: 100, waveHeight: 4, wavePeriod: 9 }
-      ]
-    }
-  ];
-
-  // Different buoy data for each leg
-  const buoyDataByLeg = {
-    "1": [ // San Diego to Oceanside
+  // build a simple 5-hour placeholder for your ForecastStrip (you can replace with real hourly later)
+  const forecastLocations = useMemo(() => {
+    const mkHours = (base: number) =>
+      ["08:00","09:00","10:00","11:00","12:00"].map((t, i) => ({
+        time: t,
+        windSpeed: base + i * 2,
+        windGust: base + i * 2 + 4,
+        windDirection: 50 + i * 15,
+        waveHeight: 3 + Math.min(4, i),
+        wavePeriod: 8 + (i % 3),
+      }))
+    return [
       {
-        id: "46232",
-        name: "Point Loma South",
-        location: "32.610°N 117.391°W",
-        distance: "8 nm SW",
-        lastUpdate: "14:50 PST",
-        conditions: {
-          windSpeed: 14, windGust: 18, windDirection: 270,
-          waveHeight: 4.2, dominantWavePeriod: 9, averageWavePeriod: 7.5,
-          windWaveHeight: 2.1, windWavePeriod: 5, swellHeight: 3.2,
-          swellPeriod: 12, swellDirection: 275, waterTemp: 68
-        }
+        name: `${leg.from.name} (Start)`,
+        coordinates: `${leg.from.lat.toFixed(3)}°N, ${Math.abs(leg.from.lon).toFixed(3)}°W`,
+        forecast: mkHours(12),
       },
       {
-        id: "46086",
-        name: "San Clemente Basin",
-        location: "33.749°N 119.053°W",
-        distance: "25 nm NW",
-        lastUpdate: "14:50 PST",
-        conditions: {
-          windSpeed: 16, windGust: 21, windDirection: 285,
-          waveHeight: 5.1, dominantWavePeriod: 10, averageWavePeriod: 8.2,
-          windWaveHeight: 2.8, windWavePeriod: 6, swellHeight: 3.9,
-          swellPeriod: 13, swellDirection: 280, waterTemp: 66
-        }
-      }
-    ],
-    "2": [ // Oceanside to Two Harbors
-      {
-        id: "46086",
-        name: "San Clemente Basin",
-        location: "33.749°N 119.053°W",
-        distance: "12 nm SW",
-        lastUpdate: "14:50 PST",
-        conditions: {
-          windSpeed: 18, windGust: 23, windDirection: 285,
-          waveHeight: 6.2, dominantWavePeriod: 11, averageWavePeriod: 8.5,
-          windWaveHeight: 3.1, windWavePeriod: 6, swellHeight: 4.8,
-          swellPeriod: 14, swellDirection: 285, waterTemp: 64
-        }
+        name: `${leg.midpoint.name}`,
+        coordinates: `${leg.midpoint.lat.toFixed(3)}°N, ${Math.abs(leg.midpoint.lon).toFixed(3)}°W`,
+        forecast: mkHours(15),
       },
       {
-        id: "46025",
-        name: "Santa Monica Bay",
-        location: "33.749°N 119.053°W",
-        distance: "8 nm E",
-        lastUpdate: "14:50 PST",
-        conditions: {
-          windSpeed: 15, windGust: 19, windDirection: 270,
-          waveHeight: 4.8, dominantWavePeriod: 9, averageWavePeriod: 7.2,
-          windWaveHeight: 2.3, windWavePeriod: 5, swellHeight: 3.6,
-          swellPeriod: 12, swellDirection: 280, waterTemp: 66
-        }
+        name: `${leg.to.name} (End)`,
+        coordinates: `${leg.to.lat.toFixed(3)}°N, ${Math.abs(leg.to.lon).toFixed(3)}°W`,
+        forecast: mkHours(10),
       },
-      {
-        id: "46221",
-        name: "Santa Barbara",
-        location: "34.274°N 120.856°W",
-        distance: "45 nm N",
-        lastUpdate: "14:50 PST",
-        conditions: {
-          windSpeed: 22, windGust: 28, windDirection: 315,
-          waveHeight: 7.1, dominantWavePeriod: 13, averageWavePeriod: 9.8,
-          windWaveHeight: 4.2, windWavePeriod: 7, swellHeight: 5.8,
-          swellPeriod: 16, swellDirection: 300, waterTemp: 62
-        }
-      }
-    ],
-    "3": [ // Two Harbors to Marina del Rey
-      {
-        id: "46025",
-        name: "Santa Monica Bay",
-        location: "33.749°N 119.053°W",
-        distance: "5 nm E",
-        lastUpdate: "14:50 PST",
-        conditions: {
-          windSpeed: 20, windGust: 26, windDirection: 285,
-          waveHeight: 6.8, dominantWavePeriod: 12, averageWavePeriod: 9.1,
-          windWaveHeight: 3.8, windWavePeriod: 7, swellHeight: 5.2,
-          swellPeriod: 15, swellDirection: 290, waterTemp: 65
-        }
-      },
-      {
-        id: "46222",
-        name: "San Pedro",
-        location: "33.618°N 118.317°W",
-        distance: "12 nm SE",
-        lastUpdate: "14:50 PST",
-        conditions: {
-          windSpeed: 24, windGust: 31, windDirection: 300,
-          waveHeight: 7.5, dominantWavePeriod: 14, averageWavePeriod: 10.2,
-          windWaveHeight: 4.5, windWavePeriod: 8, swellHeight: 6.1,
-          swellPeriod: 17, swellDirection: 305, waterTemp: 63
-        }
-      }
     ]
-  };
+  }, [currentLegId])
 
-  const buoyData = buoyDataByLeg[currentLegId as keyof typeof buoyDataByLeg] || buoyDataByLeg["2"];
+  /** ---------- state: live data ---------- **/
+  const [buoyMap, setBuoyMap] = useState<Record<string, { obs?: Obs }>>({})
+  const [buoysLoading, setBuoysLoading] = useState(false)
+  const [forecastLine, setForecastLine] = useState<string | null>(null)
+
+  useEffect(() => {
+    // 1) fetch buoy obs in one request
+    const ids = leg.buoys.map(b => b.id).join(",")
+    setBuoysLoading(true)
+    fetch(`/api/buoys?ids=${ids}`)
+      .then(r => r.json())
+      .then(j => {
+        const next: Record<string, { obs?: Obs }> = {}
+        for (const r of j?.results ?? []) next[r.id] = { obs: r?.obs }
+        setBuoyMap(next)
+      })
+      .catch(() => setBuoyMap({}))
+      .finally(() => setBuoysLoading(false))
+
+    // 2) fetch an NWS text line for context (first period)
+    fetch(`/api/forecast?lat=${(leg.from.lat + leg.to.lat) / 2}&lon=${(leg.from.lon + leg.to.lon) / 2}`)
+      .then(r => r.json())
+      .then(j => {
+        const p = j?.forecast?.properties?.periods?.[0]
+        setForecastLine(p?.detailedForecast || p?.shortForecast || null)
+      })
+      .catch(() => setForecastLine(null))
+  }, [currentLegId])
 
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center gap-3 mb-6">
-        <Button 
-          variant="ghost" 
-          size="sm"
-          onClick={onBack}
-          className="p-2"
-        >
-          <ArrowLeft className="w-4 h-4" />
+      <div className="mb-6 flex items-center gap-3">
+        <Button variant="ghost" size="sm" onClick={onBack} className="p-2">
+          <ArrowLeft className="h-4 w-4" />
         </Button>
         <div>
-          <h1 className="text-xl">{legData.from.name} → {legData.to.name}</h1>
-          <p className="text-sm text-gray-600">{legData.distance} • {legData.duration} duration</p>
+          <h1 className="text-xl">
+            {leg.from.name} → {leg.to.name}
+          </h1>
+          <p className="text-sm text-gray-600">
+            {leg.distance} • {leg.duration} duration
+          </p>
         </div>
       </div>
 
       {/* Route Forecasts */}
       <div className="space-y-4">
         <h2 className="text-lg">Route Forecasts</h2>
+
+        {forecastLine && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Clock className="h-4 w-4 text-gray-600" />
+                NWS summary (next period)
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-gray-700">{forecastLine}</p>
+            </CardContent>
+          </Card>
+        )}
+
         {forecastLocations.map((location, index) => (
           <Card key={index}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <MapPin className="w-4 h-4 text-gray-500" />
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <MapPin className="h-4 w-4 text-gray-500" />
                     {location.name}
                   </CardTitle>
-                  <p className="text-sm text-gray-600 mt-1">{location.coordinates}</p>
+                  <p className="mt-1 text-sm text-gray-600">{location.coordinates}</p>
                 </div>
               </div>
             </CardHeader>
@@ -220,89 +188,87 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
         ))}
       </div>
 
-      {/* Buoy Conditions */}
+      {/* Buoy Conditions (LIVE) */}
       <div className="space-y-4">
-        <h2 className="text-lg">Buoy Conditions</h2>
-        {buoyData.map((buoy) => (
-          <Card key={buoy.id}>
-            <CardHeader className="pb-3">
-              <div className="flex items-start justify-between">
-                <div>
-                  <CardTitle className="text-base flex items-center gap-2">
-                    <Navigation className="w-4 h-4 text-blue-600" />
-                    {buoy.name}
-                    <Badge variant="secondary" className="text-xs">{buoy.id}</Badge>
-                  </CardTitle>
-                  <p className="text-sm text-gray-600">{buoy.location} • {buoy.distance}</p>
-                  <p className="text-xs text-gray-500">Last obs: {buoy.lastUpdate}</p>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              {/* Current Conditions Grid */}
-              <div className="grid grid-cols-3 gap-4 text-center">
-                <div>
-                  <div className="flex items-center justify-center mb-1">
-                    <Wind className="w-4 h-4 text-gray-600" />
-                  </div>
-                  <div className="font-medium">{buoy.conditions.windSpeed}kt</div>
-                  <div className="text-xs text-gray-600">
-                    G{buoy.conditions.windGust} @ {buoy.conditions.windDirection}°
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-center mb-1">
-                    <Waves className="w-4 h-4 text-gray-600" />
-                  </div>
-                  <div className="font-medium">{buoy.conditions.waveHeight}ft</div>
-                  <div className="text-xs text-gray-600">
-                    {buoy.conditions.dominantWavePeriod}s period
-                  </div>
-                </div>
-                <div>
-                  <div className="flex items-center justify-center mb-1">
-                    <div className="w-4 h-4 rounded-full bg-blue-400"></div>
-                  </div>
-                  <div className="font-medium">{buoy.conditions.waterTemp}°F</div>
-                  <div className="text-xs text-gray-600">Water temp</div>
-                </div>
-              </div>
+        <div className="flex items-center justify-between">
+          <h2 className="text-lg">Buoy Conditions</h2>
+          {buoysLoading && <span className="text-xs text-gray-500">loading…</span>}
+        </div>
 
-              {/* Swell Details */}
-              <div className="border-t pt-3">
-                <h4 className="text-sm mb-2">Swell Breakdown</h4>
-                <div className="grid grid-cols-2 gap-4 text-sm">
+        {leg.buoys.map((b) => {
+          const obs: Obs | undefined = buoyMap[b.id]?.obs
+          const wind = obs?.windKts != null ? `${round(obs.windKts)}kt` : "—"
+          const gust = obs?.gustKts != null ? `G${round(obs.gustKts)}` : ""
+          const wdir = obs?.windDirDeg != null ? `${obs.windDirDeg}° ${degToDir(obs.windDirDeg)}` : "—"
+          const waves = obs?.waveHeightFt != null ? `${round(obs.waveHeightFt, 1)}ft` : "—"
+          const period = obs?.domPeriodS != null ? `${obs.domPeriodS}s period` : "—"
+          const wtmp = obs?.waterTempF != null ? `${round(obs.waterTempF)}°F` : "—"
+
+          return (
+            <Card key={b.id}>
+              <CardHeader className="pb-3">
+                <div className="flex items-start justify-between">
                   <div>
-                    <div className="text-gray-600">Primary Swell</div>
-                    <div>{buoy.conditions.swellHeight}ft @ {buoy.conditions.swellPeriod}s</div>
-                    <div className="text-xs text-gray-500">from {buoy.conditions.swellDirection}°</div>
-                  </div>
-                  <div>
-                    <div className="text-gray-600">Wind Waves</div>
-                    <div>{buoy.conditions.windWaveHeight}ft @ {buoy.conditions.windWavePeriod}s</div>
-                    <div className="text-xs text-gray-500">local generation</div>
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Navigation className="h-4 w-4 text-blue-600" />
+                      {b.name}
+                      <Badge variant="secondary" className="text-xs">{b.id}</Badge>
+                    </CardTitle>
+                    {/* If you later store coords/distances per station, print them here */}
+                    <p className="text-xs text-gray-500">
+                      Last obs: {obs?.time ? new Date(obs.time).toLocaleString() : "—"}
+                    </p>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardHeader>
+
+              <CardContent className="space-y-4">
+                {/* Current Conditions Grid */}
+                <div className="grid grid-cols-3 gap-4 text-center">
+                  <div>
+                    <div className="mb-1 flex items-center justify-center">
+                      <Wind className="h-4 w-4 text-gray-600" />
+                    </div>
+                    <div className="font-medium">{wind}</div>
+                    <div className="text-xs text-gray-600">{gust} {wdir}</div>
+                  </div>
+
+                  <div>
+                    <div className="mb-1 flex items-center justify-center">
+                      <Waves className="h-4 w-4 text-gray-600" />
+                    </div>
+                    <div className="font-medium">{waves}</div>
+                    <div className="text-xs text-gray-600">{period}</div>
+                  </div>
+
+                  <div>
+                    <div className="mb-1 flex items-center justify-center">
+                      <div className="h-4 w-4 rounded-full bg-blue-400" />
+                    </div>
+                    <div className="font-medium">{wtmp}</div>
+                    <div className="text-xs text-gray-600">Water temp</div>
+                  </div>
+                </div>
+
+                {/* (Optional) Swell details:
+                    NDBC realtime2 doesn’t always include split swell vs wind-wave.
+                    If you add a spectral source later, render that here. */}
+              </CardContent>
+            </Card>
+          )
+        })}
       </div>
 
       {/* Action Buttons */}
       <div className="space-y-3">
-        <Button className="w-full bg-blue-600 hover:bg-blue-700">
-          Check Window
-        </Button>
-        <Button variant="outline" className="w-full">
-          See Alternate Harbor
-        </Button>
+        <Button className="w-full bg-blue-600 hover:bg-blue-700">Check Window</Button>
+        <Button variant="outline" className="w-full">See Alternate Harbor</Button>
       </div>
 
       {/* Sources */}
-      <p className="text-xs text-gray-500 text-center mt-6">
+      <p className="mt-6 text-center text-xs text-gray-500">
         Sources: NWS Marine Forecasts, NDBC Buoy Network
       </p>
     </div>
-  );
+  )
 }
