@@ -32,6 +32,9 @@ export default function App() {
             <LegDetail onBack={handleBack} legId={selectedLeg} />
           )}
         </div>
+        <div className="text-center text-muted-foreground">
+            <a href="https://www.isjuliatoast.com/"><u>Other expedition hacking projects.</u></a>
+          </div>
       </div>
     </div>
   );
