@@ -1,35 +1,44 @@
-// api/forecast.ts
-import type { VercelRequest, VercelResponse } from '@vercel/node'
+export const config = { runtime: "edge" };
 
-const UA = 'sail.isjuliatoast.com (demo app)'
+const UA = "sail.isjuliatoast.com (demo)";
 
-export default async function handler(req: VercelRequest, res: VercelResponse) {
-  const lat = Number(req.query.lat)
-  const lon = Number(req.query.lon)
-  if (!Number.isFinite(lat) || !Number.isFinite(lon)) {
-    return res.status(400).json({ error: 'lat, lon required' })
-  }
+function json(body: any, status = 200, extra: Record<string, string> = {}) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { "content-type": "application/json", ...extra },
+  });
+}
+
+export default async function handler(req: Request): Promise<Response> {
+  const url = new URL(req.url);
+  const lat = Number(url.searchParams.get("lat"));
+  const lon = Number(url.searchParams.get("lon"));
+  if (!Number.isFinite(lat) || !Number.isFinite(lon))
+    return json({ error: "lat, lon required" }, 400);
 
   try {
     const p = await fetch(`https://api.weather.gov/points/${lat},${lon}`, {
-      headers: { 'User-Agent': UA, 'Accept': 'application/geo+json' },
-    })
-    if (!p.ok) throw new Error(`points ${p.status}`)
-    const pj = await p.json()
+      headers: { "User-Agent": UA, Accept: "application/geo+json" },
+    });
+    if (!p.ok) return json({ error: `points ${p.status}` }, 502);
+    const pj = await p.json();
 
     const forecastUrl =
-      pj?.properties?.forecast || pj?.properties?.forecastZone
-    if (!forecastUrl) throw new Error('no forecast URL')
+      pj?.properties?.forecast || pj?.properties?.forecastZone;
+    if (!forecastUrl) return json({ error: "no forecast URL" }, 502);
 
     const f = await fetch(forecastUrl, {
-      headers: { 'User-Agent': UA, 'Accept': 'application/geo+json' },
-    })
-    if (!f.ok) throw new Error(`forecast ${f.status}`)
-    const fj = await f.json()
+      headers: { "User-Agent": UA, Accept: "application/geo+json" },
+    });
+    if (!f.ok) return json({ error: `forecast ${f.status}` }, 502);
+    const fj = await f.json();
 
-    res.setHeader('Cache-Control', 's-maxage=900, stale-while-revalidate=1800')
-    res.status(200).json({ lat, lon, forecast: fj })
+    return json(
+      { lat, lon, forecast: fj },
+      200,
+      { "cache-control": "s-maxage=900, stale-while-revalidate=1800" }
+    );
   } catch (e: any) {
-    res.status(502).json({ error: e?.message || 'nws error' })
+    return json({ error: e?.message || "nws error" }, 500);
   }
 }
