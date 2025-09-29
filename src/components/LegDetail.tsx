@@ -1,3 +1,4 @@
+// src/components/LegDetail.tsx
 import { useEffect, useMemo, useState } from "react"
 import { ArrowLeft, Clock, Wind, Waves, MapPin, Navigation } from "lucide-react"
 import { Button } from "./ui/button"
@@ -28,11 +29,7 @@ const degToDir = (deg?: number | null) => {
   return dirs[Math.round(((deg % 360) / 22.5)) % 16]
 }
 
-const LIMITS = {
-  comfortWindKt: 22,
-  comfortGustKt: 30,
-  comfortWaveFt: 6,
-}
+const LIMITS = { comfortWindKt: 22, comfortGustKt: 30, comfortWaveFt: 6 }
 
 function statusFromObs(o?: Obs | null) {
   if (!o) return "gray"
@@ -100,82 +97,74 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
   const currentLegId = legId || "2"
   const leg = ALL_LEGS[currentLegId as keyof typeof ALL_LEGS] || ALL_LEGS["2"]
 
-  // Placeholder inputs for ForecastStrip (swap to real hourly later)
-  const forecastLocations = useMemo(() => {
-    const mkHours = (base: number) =>
-      ["08:00","09:00","10:00","11:00","12:00"].map((t, i) => ({
-        time: t,
-        windSpeed: base + i * 2,
-        windGust: base + i * 2 + 4,
-        windDirection: 50 + i * 15,
-        waveHeight: 3 + Math.min(4, i),
-        wavePeriod: 8 + (i % 3),
-      }))
-    return [
-      {
-        name: `${leg.from.name} (Start)`,
-        coordinates: `${leg.from.lat.toFixed(3)}°N, ${Math.abs(leg.from.lon).toFixed(3)}°W`,
-        forecast: mkHours(12),
-      },
-      {
-        name: `${leg.midpoint.name}`,
-        coordinates: `${leg.midpoint.lat.toFixed(3)}°N, ${Math.abs(leg.midpoint.lon).toFixed(3)}°W`,
-        forecast: mkHours(15),
-      },
-      {
-        name: `${leg.to.name} (End)`,
-        coordinates: `${leg.to.lat.toFixed(3)}°N, ${Math.abs(leg.to.lon).toFixed(3)}°W`,
-        forecast: mkHours(10),
-      },
-    ]
-  }, [currentLegId])
+  // Three forecast locations (start / midpoint / end)
+  const locations = useMemo(() => ([
+    { key: "start", label: `${leg.from.name} (Start)`, lat: leg.from.lat, lon: leg.from.lon },
+    { key: "mid",   label: `${leg.midpoint.name}`,     lat: leg.midpoint.lat, lon: leg.midpoint.lon },
+    { key: "end",   label: `${leg.to.name} (End)`,     lat: leg.to.lat, lon: leg.to.lon },
+  ]), [currentLegId])
 
   /** ---------- state: live data ---------- **/
   const [buoyMap, setBuoyMap] = useState<Record<string, Obs | null>>({})
   const [buoysLoading, setBuoysLoading] = useState(false)
   const [forecastLine, setForecastLine] = useState<string | null>(null)
 
-  // set to true temporarily to see raw payloads in console
   const DEBUG_LOG = false
 
   useEffect(() => {
     let cancelled = false
+    ;(async () => {
+      setBuoysLoading(true)
+      const ids = leg.buoys.map(b => String(b.id))
 
-    // 1) Buoys batch
-    const ids = leg.buoys.map(b => String(b.id)).join(",")
-    setBuoysLoading(true)
+      try {
+        // Batch
+        const r = await fetch(`/api/buoys?ids=${ids.join(",")}`)
+        const j = await r.json()
+        if (DEBUG_LOG) console.log("BUOYS batch:", j)
 
-    fetch(`/api/buoys?ids=${ids}`)
-      .then(r => r.json())
-      .then(j => {
-        if (DEBUG_LOG) console.log("BUOYS RESP:", j)
         const next: Record<string, Obs | null> = {}
         const arr = Array.isArray(j?.results) ? j.results : []
         for (const item of arr) {
           const id = String(item?.id ?? item?.station ?? "")
-          const obs: Obs | null = item?.obs ?? null
-          if (id) next[id] = obs
+          next[id] = item?.obs ?? null
         }
+
+        // Fallback singles for any null/missing
+        const missing = ids.filter(id => !(id in next) || next[id] == null)
+        if (missing.length && DEBUG_LOG) console.log("fallback singles:", missing)
+        if (missing.length) {
+          const singles = await Promise.all(missing.map(async (id) => {
+            try {
+              const r1 = await fetch(`/api/buoy?id=${encodeURIComponent(id)}`)
+              const j1 = await r1.json()
+              return [id, (j1?.obs as Obs | null) ?? null] as const
+            } catch { return [id, null] as const }
+          }))
+          for (const [id, obs] of singles) next[id] = obs
+        }
+
         if (!cancelled) setBuoyMap(next)
-      })
-      .catch(err => {
-        if (DEBUG_LOG) console.error("BUOYS ERR:", err)
+      } catch (e) {
+        if (DEBUG_LOG) console.error(e)
         if (!cancelled) setBuoyMap({})
-      })
-      .finally(() => !cancelled && setBuoysLoading(false))
+      } finally {
+        if (!cancelled) setBuoysLoading(false)
+      }
 
-    // 2) NWS summary via midpoint
-    const lat = (leg.from.lat + leg.to.lat) / 2
-    const lon = (leg.from.lon + leg.to.lon) / 2
-    fetch(`/api/forecast?lat=${lat}&lon=${lon}`)
-      .then(r => r.json())
-      .then(j => {
-        if (DEBUG_LOG) console.log("FORECAST RESP:", j)
-        const p = j?.forecast?.properties?.periods?.[0]
-        setForecastLine(p?.detailedForecast || p?.shortForecast || null)
-      })
-      .catch(() => setForecastLine(null))
-
+      // NWS paragraph summary (via your /api/forecast)
+      try {
+        const lat = (leg.from.lat + leg.to.lat) / 2
+        const lon = (leg.from.lon + leg.to.lon) / 2
+        const fr = await fetch(`/api/forecast?lat=${lat}&lon=${lon}`)
+        const fj = await fr.json()
+        if (DEBUG_LOG) console.log("FORECAST text:", fj)
+        const p = fj?.forecast?.properties?.periods?.[0]
+        if (!cancelled) setForecastLine(p?.detailedForecast || p?.shortForecast || null)
+      } catch {
+        if (!cancelled) setForecastLine(null)
+      }
+    })()
     return () => { cancelled = true }
   }, [currentLegId])
 
@@ -214,21 +203,24 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
           </Card>
         )}
 
-        {forecastLocations.map((location, index) => (
-          <Card key={index}>
+        {locations.map((loc) => (
+          <Card key={loc.key}>
             <CardHeader className="pb-3">
               <div className="flex items-start justify-between">
                 <div>
                   <CardTitle className="flex items-center gap-2 text-base">
                     <MapPin className="h-4 w-4 text-gray-500" />
-                    {location.name}
+                    {loc.label}
                   </CardTitle>
-                  <p className="mt-1 text-sm text-gray-600">{location.coordinates}</p>
+                  <p className="mt-1 text-sm text-gray-600">
+                    {loc.lat.toFixed(3)}°N, {Math.abs(loc.lon).toFixed(3)}°W
+                  </p>
                 </div>
               </div>
             </CardHeader>
             <CardContent>
-              <ForecastStrip forecast={location.forecast} />
+              {/* NEW: ForecastStrip self-fetches from /api/forecastHourly */}
+              <ForecastStrip lat={loc.lat} lon={loc.lon} hours={12} />
             </CardContent>
           </Card>
         ))}
@@ -270,7 +262,6 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
               </CardHeader>
 
               <CardContent className="space-y-4">
-                {/* Current Conditions Grid */}
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div>
                     <div className="mb-1 flex items-center justify-center">
