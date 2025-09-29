@@ -100,7 +100,7 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
   const currentLegId = legId || "2"
   const leg = ALL_LEGS[currentLegId as keyof typeof ALL_LEGS] || ALL_LEGS["2"]
 
-  // Placeholder inputs for your ForecastStrip (keep until you swap to real hourly)
+  // Placeholder inputs for ForecastStrip (swap to real hourly later)
   const forecastLocations = useMemo(() => {
     const mkHours = (base: number) =>
       ["08:00","09:00","10:00","11:00","12:00"].map((t, i) => ({
@@ -135,30 +135,48 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
   const [buoysLoading, setBuoysLoading] = useState(false)
   const [forecastLine, setForecastLine] = useState<string | null>(null)
 
+  // set to true temporarily to see raw payloads in console
+  const DEBUG_LOG = false
+
   useEffect(() => {
-    // fetch buoy obs in one request
-    const ids = leg.buoys.map(b => b.id).join(",")
+    let cancelled = false
+
+    // 1) Buoys batch
+    const ids = leg.buoys.map(b => String(b.id)).join(",")
     setBuoysLoading(true)
+
     fetch(`/api/buoys?ids=${ids}`)
       .then(r => r.json())
       .then(j => {
+        if (DEBUG_LOG) console.log("BUOYS RESP:", j)
         const next: Record<string, Obs | null> = {}
-        for (const r of j?.results ?? []) next[r.id] = r?.obs ?? null
-        setBuoyMap(next)
+        const arr = Array.isArray(j?.results) ? j.results : []
+        for (const item of arr) {
+          const id = String(item?.id ?? item?.station ?? "")
+          const obs: Obs | null = item?.obs ?? null
+          if (id) next[id] = obs
+        }
+        if (!cancelled) setBuoyMap(next)
       })
-      .catch(() => setBuoyMap({}))
-      .finally(() => setBuoysLoading(false))
+      .catch(err => {
+        if (DEBUG_LOG) console.error("BUOYS ERR:", err)
+        if (!cancelled) setBuoyMap({})
+      })
+      .finally(() => !cancelled && setBuoysLoading(false))
 
-    // fetch a short NWS text line (first period) using leg midpoint
+    // 2) NWS summary via midpoint
     const lat = (leg.from.lat + leg.to.lat) / 2
     const lon = (leg.from.lon + leg.to.lon) / 2
     fetch(`/api/forecast?lat=${lat}&lon=${lon}`)
       .then(r => r.json())
       .then(j => {
+        if (DEBUG_LOG) console.log("FORECAST RESP:", j)
         const p = j?.forecast?.properties?.periods?.[0]
         setForecastLine(p?.detailedForecast || p?.shortForecast || null)
       })
       .catch(() => setForecastLine(null))
+
+    return () => { cancelled = true }
   }, [currentLegId])
 
   return (
@@ -224,7 +242,7 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
         </div>
 
         {leg.buoys.map((b) => {
-          const obs = buoyMap[b.id]
+          const obs = buoyMap[String(b.id)]
           const wind = obs?.windKts != null ? `${round(obs.windKts)}kt` : "—"
           const gust = obs?.gustKts != null ? `G${round(obs.gustKts)}` : ""
           const wdir = obs?.windDirDeg != null ? `${round(obs.windDirDeg)}° ${degToDir(obs.windDirDeg)}` : "—"
