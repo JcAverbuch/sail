@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card"
 import { ForecastStrip } from "./ForecastStrip"
 import { Badge } from "./ui/badge"
 
-/** ---------- helpers ---------- **/
+/** ---------- types & helpers ---------- **/
 
 type Obs = {
   time?: string
@@ -18,12 +18,36 @@ type Obs = {
   waterTempF?: number | null
   airTempF?: number | null
 }
+
 const round = (n: number | null | undefined, d = 0) =>
-  n == null ? "—" : Number(n.toFixed(d)).toString()
+  n == null || !Number.isFinite(n) ? "—" : Number(n.toFixed(d)).toString()
+
 const degToDir = (deg?: number | null) => {
-  if (deg == null || isNaN(deg)) return "—"
+  if (deg == null || !Number.isFinite(deg)) return "—"
   const dirs = ["N","NNE","NE","ENE","E","ESE","SE","SSE","S","SSW","SW","WSW","W","WNW","NW","NNW"]
-  return dirs[Math.round((deg % 360) / 22.5) % 16]
+  return dirs[Math.round(((deg % 360) / 22.5)) % 16]
+}
+
+const LIMITS = {
+  comfortWindKt: 22,
+  comfortGustKt: 30,
+  comfortWaveFt: 6,
+}
+
+function statusFromObs(o?: Obs | null) {
+  if (!o) return "gray"
+  if ((o.gustKts ?? 0) > LIMITS.comfortGustKt || (o.waveHeightFt ?? 0) > LIMITS.comfortWaveFt) return "red"
+  if ((o.windKts ?? 0) > LIMITS.comfortWindKt) return "yellow"
+  return "green"
+}
+
+function dotClass(status: "green" | "yellow" | "red" | "gray") {
+  switch (status) {
+    case "green": return "bg-green-500"
+    case "yellow": return "bg-yellow-500"
+    case "red": return "bg-red-500"
+    default: return "bg-gray-300"
+  }
 }
 
 /** ---------- per-leg data ---------- **/
@@ -70,11 +94,13 @@ interface LegDetailProps {
   legId: string | null
 }
 
+/** ---------- component ---------- **/
+
 export function LegDetail({ onBack, legId }: LegDetailProps) {
   const currentLegId = legId || "2"
   const leg = ALL_LEGS[currentLegId as keyof typeof ALL_LEGS] || ALL_LEGS["2"]
 
-  // build a simple 5-hour placeholder for your ForecastStrip (you can replace with real hourly later)
+  // Placeholder inputs for your ForecastStrip (keep until you swap to real hourly)
   const forecastLocations = useMemo(() => {
     const mkHours = (base: number) =>
       ["08:00","09:00","10:00","11:00","12:00"].map((t, i) => ({
@@ -105,26 +131,28 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
   }, [currentLegId])
 
   /** ---------- state: live data ---------- **/
-  const [buoyMap, setBuoyMap] = useState<Record<string, { obs?: Obs }>>({})
+  const [buoyMap, setBuoyMap] = useState<Record<string, Obs | null>>({})
   const [buoysLoading, setBuoysLoading] = useState(false)
   const [forecastLine, setForecastLine] = useState<string | null>(null)
 
   useEffect(() => {
-    // 1) fetch buoy obs in one request
+    // fetch buoy obs in one request
     const ids = leg.buoys.map(b => b.id).join(",")
     setBuoysLoading(true)
     fetch(`/api/buoys?ids=${ids}`)
       .then(r => r.json())
       .then(j => {
-        const next: Record<string, { obs?: Obs }> = {}
-        for (const r of j?.results ?? []) next[r.id] = { obs: r?.obs }
+        const next: Record<string, Obs | null> = {}
+        for (const r of j?.results ?? []) next[r.id] = r?.obs ?? null
         setBuoyMap(next)
       })
       .catch(() => setBuoyMap({}))
       .finally(() => setBuoysLoading(false))
 
-    // 2) fetch an NWS text line for context (first period)
-    fetch(`/api/forecast?lat=${(leg.from.lat + leg.to.lat) / 2}&lon=${(leg.from.lon + leg.to.lon) / 2}`)
+    // fetch a short NWS text line (first period) using leg midpoint
+    const lat = (leg.from.lat + leg.to.lat) / 2
+    const lon = (leg.from.lon + leg.to.lon) / 2
+    fetch(`/api/forecast?lat=${lat}&lon=${lon}`)
       .then(r => r.json())
       .then(j => {
         const p = j?.forecast?.properties?.periods?.[0]
@@ -157,7 +185,7 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
         {forecastLine && (
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-sm flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-sm">
                 <Clock className="h-4 w-4 text-gray-600" />
                 NWS summary (next period)
               </CardTitle>
@@ -196,13 +224,14 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
         </div>
 
         {leg.buoys.map((b) => {
-          const obs: Obs | undefined = buoyMap[b.id]?.obs
+          const obs = buoyMap[b.id]
           const wind = obs?.windKts != null ? `${round(obs.windKts)}kt` : "—"
           const gust = obs?.gustKts != null ? `G${round(obs.gustKts)}` : ""
-          const wdir = obs?.windDirDeg != null ? `${obs.windDirDeg}° ${degToDir(obs.windDirDeg)}` : "—"
+          const wdir = obs?.windDirDeg != null ? `${round(obs.windDirDeg)}° ${degToDir(obs.windDirDeg)}` : "—"
           const waves = obs?.waveHeightFt != null ? `${round(obs.waveHeightFt, 1)}ft` : "—"
           const period = obs?.domPeriodS != null ? `${obs.domPeriodS}s period` : "—"
           const wtmp = obs?.waterTempF != null ? `${round(obs.waterTempF)}°F` : "—"
+          const status = statusFromObs(obs)
 
           return (
             <Card key={b.id}>
@@ -210,11 +239,11 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
                 <div className="flex items-start justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2 text-base">
+                      <span className={`inline-block h-2.5 w-2.5 rounded-full ${dotClass(status)}`} />
                       <Navigation className="h-4 w-4 text-blue-600" />
                       {b.name}
                       <Badge variant="secondary" className="text-xs">{b.id}</Badge>
                     </CardTitle>
-                    {/* If you later store coords/distances per station, print them here */}
                     <p className="text-xs text-gray-500">
                       Last obs: {obs?.time ? new Date(obs.time).toLocaleString() : "—"}
                     </p>
@@ -249,10 +278,6 @@ export function LegDetail({ onBack, legId }: LegDetailProps) {
                     <div className="text-xs text-gray-600">Water temp</div>
                   </div>
                 </div>
-
-                {/* (Optional) Swell details:
-                    NDBC realtime2 doesn’t always include split swell vs wind-wave.
-                    If you add a spectral source later, render that here. */}
               </CardContent>
             </Card>
           )
