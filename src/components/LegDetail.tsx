@@ -51,6 +51,18 @@ const worse = (s: Status, steps = 1): Status => {
   return order[idx]
 }
 
+function maxEffectiveWaveFt(buoyObs: { waveHeightFt?: number|null; domPeriodS?: number|null }[]) {
+  let max = -Infinity
+  for (const b of buoyObs) {
+    if (b.waveHeightFt == null || !Number.isFinite(b.waveHeightFt)) continue
+    const period = b.domPeriodS ?? null
+    const shortPenalty = Number.isFinite(period) && (period as number) < 7 ? 1 : 0
+    const effective = (b.waveHeightFt as number) + shortPenalty
+    if (effective > max) max = effective
+  }
+  return max
+}
+
 /** ---------- per-leg data (7 legs) + comfort ---------- **/
 
 const ALL_LEGS = {
@@ -151,24 +163,42 @@ function computeSignals(buoyObs: Obs[], hourly: HourPoint[]) {
   return { gusty, fog, santaAna }
 }
 
-function computeStatus(comfort: { windKt: number; gustKt: number; waveFt: number }, buoyObs: Obs[], hourly: HourPoint[], signals: { gusty: boolean; fog: boolean; santaAna: boolean }): Status {
-  const maxWave = Math.max(...buoyObs.map(b => b.waveHeightFt ?? -Infinity), -Infinity)
+function computeStatus(
+  comfort: { windKt: number; gustKt: number; waveFt: number },
+  buoyObs: Obs[],
+  hourly: HourPoint[],
+  signals: { gusty: boolean; fog: boolean; santaAna: boolean }
+): Status {
+  const { gusty, santaAna } = signals
+
+  // Effective comfort wave (+1ft everywhere)
+  const comfortWave = comfort.waveFt + 1
+
+  // Max effective wave with short-period penalty
+  const maxEffWave = maxEffectiveWaveFt(buoyObs)
+
+  // Peak wind/gust from next 6 hours
   const next6 = hourly.slice(0, 6)
   const peakWind = Math.max(...next6.map(h => h.windKts ?? -Infinity), -Infinity)
   const peakGust = Math.max(...next6.map(h => h.gustKts ?? -Infinity), -Infinity)
 
-  const wave = Number.isFinite(maxWave) ? maxWave : -Infinity
-  const wind = Number.isFinite(peakWind) ? peakWind : -Infinity
-  const gust = Number.isFinite(peakGust) ? peakGust : -Infinity
-
+  // Baseline
   let status: Status = "green"
-  if (gust > comfort.gustKt || wave > comfort.waveFt) status = "red"
-  else if (wind > comfort.windKt * 0.9 || wave > comfort.waveFt * 0.85) status = "yellow"
+  if ((Number.isFinite(maxEffWave) && maxEffWave >= 1.5 * comfortWave) ||
+      (Number.isFinite(peakGust)   && peakGust > comfort.gustKt)) {
+    status = "red"
+  } else if ((Number.isFinite(maxEffWave) && maxEffWave > comfortWave) ||
+             (Number.isFinite(peakWind)   && peakWind > comfort.windKt)) {
+    status = "yellow"
+  }
 
-  if (signals.gusty) status = worse(status, 1)
-  if (signals.santaAna) status = "red"
+  // Adjustments
+  if (gusty) status = status === "green" ? "yellow" : "red"
+  if (santaAna) status = "red"
+
   return status
 }
+
 
 /** ---------- component ---------- **/
 
