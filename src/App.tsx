@@ -21,7 +21,7 @@ export default function App() {
       <div className="max-w-md mx-auto bg-white min-h-screen">
         {/* Header */}
         <div className="bg-blue-600 text-white p-4 sticky top-0 z-10">
-          <h1 className="text-center">SoCal Sailing Agent</h1>
+          <h1 className="text-center">SoCal Sailor</h1>
         </div>
 
         {/* Content */}
