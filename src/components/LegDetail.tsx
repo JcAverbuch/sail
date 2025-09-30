@@ -60,7 +60,7 @@ const ALL_LEGS = {
     midpoint: { name: "Del Mar", lat: (32.7157+33.1958)/2, lon: (-117.1611-117.3831)/2 },
     distance: "35 nm est",
     duration: "6-8h",
-    comfort: { windKt: 15, gustKt: 22, waveFt: 4 },
+    comfort: { windKt: 15, gustKt: 22, waveFt: 5 },
     buoys: [{ id: "46232", name: "Point Loma South" }, { id: "46086", name: "San Clemente Basin" }],
   },
   "2": {
@@ -69,7 +69,7 @@ const ALL_LEGS = {
     midpoint: { name: "Mid-Channel", lat: (33.1958+33.4447)/2, lon: (-117.3831-118.4895)/2 },
     distance: "42 nm est",
     duration: "8-10h",
-    comfort: { windKt: 14, gustKt: 22, waveFt: 4 },
+    comfort: { windKt: 14, gustKt: 22, waveFt: 5 },
     buoys: [{ id: "46086", name: "San Clemente Basin" }, { id: "46025", name: "Santa Monica Bay" }, { id: "46222", name: "San Pedro" }],
   },
   "3": {
@@ -78,7 +78,7 @@ const ALL_LEGS = {
     midpoint: { name: "Anacapa Passage", lat: (33.4447+34.0300)/2, lon: (-118.4895-119.7600)/2 },
     distance: "65 nm est",
     duration: "12-16h",
-    comfort: { windKt: 13, gustKt: 20, waveFt: 4 },
+    comfort: { windKt: 13, gustKt: 20, waveFt: 5 },
     buoys: [{ id: "46086", name: "San Clemente Basin" }, { id: "46221", name: "Santa Barbara West" }, { id: "46217", name: "Anacapa Passage" }],
   },
   "4": {
@@ -87,7 +87,7 @@ const ALL_LEGS = {
     midpoint: { name: "Santa Cruz Channel", lat: (34.03+33.985)/2, lon: (-119.76-120.057)/2 },
     distance: "18 nm est",
     duration: "4-6h",
-    comfort: { windKt: 12, gustKt: 18, waveFt: 4 },
+    comfort: { windKt: 12, gustKt: 18, waveFt: 5 },
     buoys: [{ id: "46221", name: "Santa Barbara West" }, { id: "46054", name: "West Santa Barbara" }],
   },
   "5": {
@@ -96,7 +96,7 @@ const ALL_LEGS = {
     midpoint: { name: "Anacapa Passage", lat: (34.0300+33.4447)/2, lon: (-119.7600-118.4895)/2 },
     distance: "65 nm est",
     duration: "12-16h",
-    comfort: { windKt: 13, gustKt: 20, waveFt: 4 },
+    comfort: { windKt: 13, gustKt: 20, waveFt: 5 },
     buoys: [{ id: "46221", name: "Santa Barbara West" }, { id: "46217", name: "Anacapa Passage" }, { id: "46086", name: "San Clemente Basin" }],
   },
   "6": {
@@ -105,7 +105,7 @@ const ALL_LEGS = {
     midpoint: { name: "Mid-Channel", lat: (33.4447+33.1958)/2, lon: (-118.4895-117.3831)/2 },
     distance: "42 nm est",
     duration: "8-10h",
-    comfort: { windKt: 14, gustKt: 22, waveFt: 4 },
+    comfort: { windKt: 14, gustKt: 22, waveFt: 5 },
     buoys: [{ id: "46222", name: "San Pedro" }, { id: "46025", name: "Santa Monica Bay" }, { id: "46086", name: "San Clemente Basin" }],
   },
   "7": {
@@ -114,7 +114,7 @@ const ALL_LEGS = {
     midpoint: { name: "Del Mar", lat: (33.1958+32.7157)/2, lon: (-117.3831-117.1611)/2 },
     distance: "35 nm est",
     duration: "6-8h",
-    comfort: { windKt: 15, gustKt: 22, waveFt: 4 },
+    comfort: { windKt: 15, gustKt: 22, waveFt: 5 },
     buoys: [{ id: "46086", name: "San Clemente Basin" }, { id: "46232", name: "Point Loma South" }],
   },
 } as const

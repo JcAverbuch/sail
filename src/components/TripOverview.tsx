@@ -52,7 +52,7 @@ const LEGS: LegConfig[] = [
     distance: "35 nm est",
     window: "06:00–12:00",
     comfortCopy: "up to 15 kt / 4 ft",
-    comfort: { windKt: 15, gustKt: 22, waveFt: 4 },
+    comfort: { windKt: 15, gustKt: 22, waveFt: 5 },
     buoys: ["46232","46086"],
   },
   {
@@ -63,7 +63,7 @@ const LEGS: LegConfig[] = [
     distance: "42 nm est",
     window: "08:00–14:00",
     comfortCopy: "up to 14 kt / 4 ft",
-    comfort: { windKt: 14, gustKt: 22, waveFt: 4 },
+    comfort: { windKt: 14, gustKt: 22, waveFt: 5 },
     buoys: ["46086","46025","46222"],
   },
   {
@@ -74,7 +74,7 @@ const LEGS: LegConfig[] = [
     distance: "65 nm est",
     window: "06:00–18:00",
     comfortCopy: "up to 13 kt / 4 ft",
-    comfort: { windKt: 13, gustKt: 20, waveFt: 4 },
+    comfort: { windKt: 13, gustKt: 20, waveFt: 5 },
     buoys: ["46086","46221","46217"],
   },
   {
@@ -85,7 +85,7 @@ const LEGS: LegConfig[] = [
     distance: "18 nm est",
     window: "07:00–15:00",
     comfortCopy: "up to 12 kt / 4 ft",
-    comfort: { windKt: 12, gustKt: 18, waveFt: 4 },
+    comfort: { windKt: 12, gustKt: 18, waveFt: 5 },
     buoys: ["46221","46054"],
   },
   {
@@ -96,7 +96,7 @@ const LEGS: LegConfig[] = [
     distance: "65 nm est",
     window: "06:00–18:00",
     comfortCopy: "up to 13 kt / 4 ft",
-    comfort: { windKt: 13, gustKt: 20, waveFt: 4 },
+    comfort: { windKt: 13, gustKt: 20, waveFt: 5 },
     buoys: ["46221","46217","46086"],
   },
   {
@@ -107,7 +107,7 @@ const LEGS: LegConfig[] = [
     distance: "42 nm est",
     window: "08:00–16:00",
     comfortCopy: "up to 14 kt / 4 ft",
-    comfort: { windKt: 14, gustKt: 22, waveFt: 4 },
+    comfort: { windKt: 14, gustKt: 22, waveFt: 5 },
     buoys: ["46222","46025","46086"],
   },
   {
